@@ -40,6 +40,7 @@ limitations under the License.
 #include "absl/functional/function_ref.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
+#include "absl/numeric/bits.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -2392,7 +2393,17 @@ GlobalDecreasingSizeBestFitHeap<BufferType>::MakeFreeChunks(
     free_chunks.erase(it_end, it_start);
 
     // Create a new free chunk after the used chunk, if it is large enough.
-    int64_t chunk_end_aligned = RoundUpTo(used_chunk.chunk_end(), alignment_);
+    int64_t chunk_end_aligned = used_chunk.chunk_end();
+    if (alignment_ != 1) {
+      if (alignment_ > 0 &&
+          absl::has_single_bit(static_cast<uint64_t>(alignment_))) {
+        // Alignment is 2^n, add 2^n-1 and then zero the last n bits.
+        chunk_end_aligned =
+            (chunk_end_aligned + alignment_ - 1) & ~(alignment_ - 1);
+      } else {
+        chunk_end_aligned = RoundUpTo(used_chunk.chunk_end(), alignment_);
+      }
+    }
     if (free_chunk_end - chunk_end_aligned >= max_colocation_size) {
       CHECK(free_chunks.insert({chunk_end_aligned, free_chunk_end}).second);
     }

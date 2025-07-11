@@ -3837,7 +3837,7 @@ class GlobalDecreasingSizeBestFitHeapBenchmark : public HeapAlgorithmTestBase {
       buffers.push_back(DummyBufferValue());
     }
     for (auto s : state) {
-      GlobalDecreasingSizeBestFitHeap<HloValue> heap(/*alignment=*/1);
+      GlobalDecreasingSizeBestFitHeap<HloValue> heap(state.range(1));
       for (int i = 0; i < n; i++) {
         heap.Alloc(buffers[i], i * 20);
       }
@@ -3855,7 +3855,8 @@ static void BM_GlobalDecreasingSizeBestFitHeap(
   GlobalDecreasingSizeBestFitHeapBenchmark bm;
   bm.RunBenchmark(state);
 }
-BENCHMARK(BM_GlobalDecreasingSizeBestFitHeap)->Arg(1)->Arg(4)->Arg(16)->Arg(64);
+BENCHMARK(BM_GlobalDecreasingSizeBestFitHeap)
+    ->ArgsProduct({{1, 4, 16, 64}, {1, 1024}});
 
 }  // namespace
 }  // namespace xla
