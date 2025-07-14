@@ -77,8 +77,10 @@ void IfrtLowerAtomProgramMetadataToXlaPass::runOnOperation() {
             i, kIfrtShardingAttrName);
     if (sharding_attr == nullptr) {
       // The op has already been visited, and the IFRT attributes have been
-      // removed. Verify that kHloShardingAttrName has been set.
-      if (func_op.getArgAttr(i, kHloShardingAttrName) == nullptr) {
+      // removed. Verify that kHloShardingAttrName has been set if the module is
+      // not sdy partitioned.
+      if (!module_op->hasAttr(kIsSdyPartitioned) &&
+          func_op.getArgAttr(i, kHloShardingAttrName) == nullptr) {
         func_op.emitOpError() << "can't find `" << kIfrtShardingAttrName
                               << "` attribute of input #" << i << " to set `"
                               << kHloShardingAttrName << "` attribute";
@@ -103,28 +105,30 @@ void IfrtLowerAtomProgramMetadataToXlaPass::runOnOperation() {
       return;
     }
 
-    if (local_view_attr != nullptr) {
-      // The arguments to the function are already sharded, so we do not
-      // need to shard them again.
-      func_op.setArgAttr(
-          i, kHloShardingAttrName,
-          builder.getStringAttr(xla::HloSharding::Replicate().ToString()));
-    } else {
-      const auto sharding_param_attr =
-          func_op.getArgAttrOfType<IfrtShardingParamAttr>(
-              i, kIfrtShardingAttrName);
-      auto hlo_sharding =
-          xla::ifrt::support::ToHloSharding(sharding_param_attr.getSharding());
-      if (!hlo_sharding.ok()) {
-        func_op.emitOpError() << "can't lower sharding of input #" << i
-                              << ". Sharding: " << sharding_param_attr << ". "
-                              << hlo_sharding.status().message();
-        signalPassFailure();
-        return;
+    if (!module_op->hasAttr(kIsSdyPartitioned)) {
+      if (local_view_attr != nullptr) {
+        // The arguments to the function are already sharded, so we do not
+        // need to shard them again.
+        func_op.setArgAttr(
+            i, kHloShardingAttrName,
+            builder.getStringAttr(xla::HloSharding::Replicate().ToString()));
+      } else {
+        const auto sharding_param_attr =
+            func_op.getArgAttrOfType<IfrtShardingParamAttr>(
+                i, kIfrtShardingAttrName);
+        auto hlo_sharding = xla::ifrt::support::ToHloSharding(
+            sharding_param_attr.getSharding());
+        if (!hlo_sharding.ok()) {
+          func_op.emitOpError() << "can't lower sharding of input #" << i
+                                << ". Sharding: " << sharding_param_attr << ". "
+                                << hlo_sharding.status().message();
+          signalPassFailure();
+          return;
+        }
+        func_op.setArgAttr(
+            i, kHloShardingAttrName,
+            builder.getStringAttr(hlo_sharding.value().ToString()));
       }
-      func_op.setArgAttr(
-          i, kHloShardingAttrName,
-          builder.getStringAttr(hlo_sharding.value().ToString()));
     }
     const auto memory_kind_attr =
         func_op.getArgAttrOfType<mlir::StringAttr>(i, kIfrtMemoryKindAttrName);
@@ -140,8 +144,10 @@ void IfrtLowerAtomProgramMetadataToXlaPass::runOnOperation() {
             i, kIfrtShardingAttrName);
     if (sharding_attr == nullptr) {
       // The op has already been visited, and the IFRT attributes have been
-      // removed. Verify that kHloShardingAttrName has been set.
-      if (func_op.getResultAttr(i, kHloShardingAttrName) == nullptr) {
+      // removed. Verify that kHloShardingAttrName has been set if the module is
+      // not sdy partitioned.
+      if (!module_op->hasAttr(kIsSdyPartitioned) &&
+          func_op.getResultAttr(i, kHloShardingAttrName) == nullptr) {
         func_op.emitOpError() << "can't find `" << kIfrtShardingAttrName
                               << "` attribute of output #" << i << " to set `"
                               << kHloShardingAttrName << "` attribute";
@@ -166,28 +172,30 @@ void IfrtLowerAtomProgramMetadataToXlaPass::runOnOperation() {
       return;
     }
 
-    if (local_view_attr != nullptr) {
-      // The results of the function are already sharded, so we do not need
-      // to shard them again.
-      func_op.setResultAttr(
-          i, kHloShardingAttrName,
-          builder.getStringAttr(xla::HloSharding::Replicate().ToString()));
-    } else {
-      const auto sharding_param_attr =
-          func_op.getResultAttrOfType<IfrtShardingParamAttr>(
-              i, kIfrtShardingAttrName);
-      auto hlo_sharding =
-          xla::ifrt::support::ToHloSharding(sharding_param_attr.getSharding());
-      if (!hlo_sharding.ok()) {
-        func_op.emitOpError() << "can't lower sharding of output #" << i
-                              << ". Sharding: " << sharding_param_attr << ". "
-                              << hlo_sharding.status().message();
-        signalPassFailure();
-        return;
+    if (!module_op->hasAttr(kIsSdyPartitioned)) {
+      if (local_view_attr != nullptr) {
+        // The results of the function are already sharded, so we do not need
+        // to shard them again.
+        func_op.setResultAttr(
+            i, kHloShardingAttrName,
+            builder.getStringAttr(xla::HloSharding::Replicate().ToString()));
+      } else {
+        const auto sharding_param_attr =
+            func_op.getResultAttrOfType<IfrtShardingParamAttr>(
+                i, kIfrtShardingAttrName);
+        auto hlo_sharding = xla::ifrt::support::ToHloSharding(
+            sharding_param_attr.getSharding());
+        if (!hlo_sharding.ok()) {
+          func_op.emitOpError() << "can't lower sharding of output #" << i
+                                << ". Sharding: " << sharding_param_attr << ". "
+                                << hlo_sharding.status().message();
+          signalPassFailure();
+          return;
+        }
+        func_op.setResultAttr(
+            i, kHloShardingAttrName,
+            builder.getStringAttr(hlo_sharding.value().ToString()));
       }
-      func_op.setResultAttr(
-          i, kHloShardingAttrName,
-          builder.getStringAttr(hlo_sharding.value().ToString()));
     }
     const auto memory_kind_attr = func_op.getResultAttrOfType<mlir::StringAttr>(
         i, kIfrtMemoryKindAttrName);
